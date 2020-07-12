@@ -1,0 +1,98 @@
+import pandas as pd 
+import numpy as np
+import sklearn as sk
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from keras.callbacks import EarlyStopping
+from keras.callbacks import ModelCheckpoint
+from keras.metrics import Precision, Recall
+from keras.layers import Conv1D, Embedding, Input, MaxPooling1D
+from keras.layers.core import Dense, Dropout, Flatten
+from keras.models import Model
+from keras.layers.merge import concatenate
+from numpy import array
+from keras.preprocessing.sequence import pad_sequences
+from keras.preprocessing.text import one_hot
+from sklearn.model_selection import train_test_split
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
+porter = PorterStemmer()
+
+data= pd.read_csv("C:\\Users\\Regina Eckhardt\\Documents\\Leuphana\\hbi_textClassification\\20_analyzed.csv",encoding='latin1')
+mydata = data[:732]
+
+mydata = mydata.drop('Unnamed: 13', 1)
+mydata = mydata.drop('Unnamed: 14', 1)
+mydata = mydata.drop('Unnamed: 15', 1)
+
+message = mydata['body']
+X = message.tolist()
+mydata.loc[mydata['affective tone'].astype(str) == 'mixed', 'affective tone int'] = 0
+mydata.loc[mydata['affective tone'].astype(str) == 'none', 'affective tone int'] = 1
+mydata.loc[mydata['affective tone'].astype(str) == 'negative', 'affective tone int'] = 2
+mydata.loc[mydata['affective tone'].astype(str) == 'positive', 'affective tone int'] = 3
+y = mydata['affective tone int'].astype(int).tolist()
+
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size = 0.3, random_state= 42)
+
+print("Total number of labeled messages:", len(X))
+print("Number of messages in the training set:", len(X_train))
+print("Number of messages in the test set:", len(X_test))
+
+def stemSentence(sentence):
+    token_words = word_tokenize(sentence)
+    stem_sentence = (porter.stem(word) for word in token_words)
+    return " ".join(stem_sentence)
+
+def preprocess_text(data_x, max_length=279, vocab_size=10000):
+    X_2 = (stemSentence(x) for x in data_x)
+    encoded_texts_ws = [one_hot(t, vocab_size) for t in X_2]
+    padded_texts_ws = pad_sequences(encoded_texts_ws, maxlen=max_length, padding="post", truncating="post")
+    return padded_texts_ws
+
+def preprocess_label(data_y):
+    y_1 = []
+    for x in data_y:
+        if x == 0:
+            y_1.append([1, 0, 0, 0])
+        elif x == 1:
+            y_1.append([0, 1, 0, 0])
+        elif x == 2:
+            y_1.append([0, 0, 1, 0])
+        else:
+            y_1.append([0, 0, 0, 1])
+    y_1 = np.vstack(y_1)
+    return y_1
+    
+X_1 = (stemSentence(x) for x in X_train)
+X_2 = (stemSentence(x) for x in X_test)
+encoded_texts_1 = [one_hot(t, 10000) for t in X_1]
+encoded_texts_2 = [one_hot(t, 10000) for t in X_2]
+
+length1 = [len(x) for x in encoded_texts_1]
+length2 = [len(x) for x in encoded_texts_2]
+length = np.concatenate((length1,length2),axis=0)
+#print(length)
+print(np.mean(length1))
+print(np.mean(length2))
+print(np.mean(length))
+print("Q1 quantile of labeled messages : ", np.quantile(length, .25)) 
+print("Q2 quantile of labeled messages : ", np.quantile(length, .50)) 
+print("Q3 quantile of labeled messages : ", np.quantile(length, .75)) 
+print("80% quantile of labeled messages : ", np.quantile(length, .80)) 
+print("85% quantile of labeled messages : ", np.quantile(length, .85)) 
+print("90% quantile of labeled messages : ", np.quantile(length, .90)) 
+print("95% quantile of labeled messages : ", np.quantile(length, .95)) 
+print("97.5% quantile of labeled messages : ", np.quantile(length, .975))
+print("99% quantile of labeled messages : ", np.quantile(length, .99))
+print("99.5% quantile of labeled messages : ", np.quantile(length, .995))
+print("Q4 quantile of labeled messages : ", np.quantile(length, 1.)) 
+plt.hist(length, bins = 10)
+plt.title("Distribution of the length of the messages")
+plt.xlabel("number of words")
+plt.ylabel("number of messages")
+
+Xtrain = preprocess_text(X_train)
+Xtest = preprocess_text(X_test)
+ytest = preprocess_label(y_test)
+ytrain = preprocess_label(y_train)
